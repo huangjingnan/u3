@@ -164,7 +164,7 @@ git --version
    - Mac：把 Cursor 拖到 Applications 文件夹
    - Windows：双击 .exe 一路下一步
 4. 打开 Cursor，用邮箱注册并登录（免费版即可）
-5. 装好后告诉我"Cursor 装好了"，我再继续。
+5. 完成后请确认已安装
 ```
 
 ---
@@ -183,7 +183,7 @@ git --version
    - Mac：双击 .dmg，把应用拖到 Applications
    - Windows：双击 .exe 一路下一步
 4. 首次打开会要求扫码，用你的微信扫一下登录
-5. 装好后告诉我"微信开发者工具装好了"，我再继续。
+5. 完成后请确认已安装
 ```
 
 ---
