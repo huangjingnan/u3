@@ -20,7 +20,7 @@ Agent 在开始前必须用 `AskQuestion` 向学员确认：
 
 1. **当前操作系统**：让学员明确说出 "Mac / Windows / Linux（Ubuntu/Debian）"，而不是自己猜
 2. **是否允许全局安装**：说明将安装 nvm、pnpm，可能修改 shell 配置文件（`~/.zshrc` / `~/.bashrc`）
-3. **当前目录**：在哪里建项目（默认 `~/Desktop/apps`）
+3. **当前目录**：在哪里建项目。**默认是在当前仓库根目录下创建 `./my-app/`**（即 unibest 默认项目名 `my-app`，与本仓库同层）
 
 得到全部答复后才进入第 1 步。
 
@@ -190,27 +190,30 @@ git --version
 
 ### Step 6 / 创建 unibest 项目
 
+**项目位置约定**：脚手架放在**当前仓库根目录下**的 `./my-app/`（即与 `AGENTS.md` / `.gitignore` / `.cursor/` 同层）。
+- ✅ 好处：PRD（`docs/prd/*.md`）与代码（`my-app/`）同仓库，路径关系清晰
+- ✅ 好处：`my-app/` 已在 `.gitignore` 中，不进 git（学员克隆后重跑本 Skill 自动重建）
+- ❌ **不要**放到 `~/Desktop/apps/` 等仓库外位置，会造成 PRD 和代码分离
+
 **Agent 必做**：先 `AskQuestion` 确认两个参数：
-- **项目目录**：默认 `~/Desktop/apps`（或 Windows 下 `D:\apps`）
-- **项目名**：默认 `my-app`
+- **项目目录**：默认 `./my-app`（即当前目录的子目录，相对路径）
+- **项目名**：默认 `my-app`（与目录名一致）
 
 得到答复后执行：
 
 ```bash
-# Mac / Linux
-mkdir -p ~/Desktop/apps
-cd ~/Desktop/apps
+# Mac / Linux —— 假设当前是仓库根目录
+mkdir -p my-app
 npm create unibest my-app --ui wot-ui --platform h5,mp-weixin --login false --i18n false --lime-echart --ucharts
 cd my-app
 pnpm install
 ```
 
 ```powershell
-# Windows (PowerShell)
-mkdir D:\apps
-cd D:\apps
-npm create unibest my-app --ui wot-ui --platform h5,mp-weixin --login false --i18n false --lime-echart --ucharts
+# Windows (PowerShell) —— 假设当前是仓库根目录
+mkdir my-app
 cd my-app
+npm create unibest my-app --ui wot-ui --platform h5,mp-weixin --login false --i18n false --lime-echart --ucharts
 pnpm install
 ```
 

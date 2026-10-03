@@ -9,18 +9,23 @@ description: 开发微信小程序的标准工作流规范。当用户说"开发
 
 **结构**：用户输入 `[xxx]` 为核心功能需求（变量），其余部分为固定约束，Agent 无权删改。
 
+**与 weapp-frontend-design 的关系**：本 Skill 可独立调用。**如果 `docs/prd/*.md` 存在，优先按 PRD 里的"## 核心功能"清单实现**（即先经过 `weapp-frontend-design` 确认过的方案）；不存在则按学员本轮直接描述的功能开发。三个 Skill（`weapp-env-setup` / `weapp-frontend-design` / `weapp-dev-workflow`）正交独立，可单独使用，也可串联。
+
 ---
 
 ## 1. 开发前必做
 
-Agent 在开始写代码前**必须先读取** `.agents/` 目录（如果存在），了解：
+Agent 在开始写代码前**必须先读取** `./my-app/.agents/` 目录（如果存在），了解：
 
 - 脚手架目录规范
 - 组件库用法约定
 - 路由/页面文件组织方式
 - Mock 数据存放规范
 
-若 `.agents/` 不存在，跳过此步。
+> **路径说明**：本仓库只放 Skills 和 PRD，**实际 unibest 工程代码放在 `./my-app/`**（由 `weapp-env-setup` Step 6 创建）。
+> PRD 在 `docs/prd/*.md`，代码在 `my-app/src/`，两者同仓库但分层明确。
+
+若 `./my-app/.agents/` 不存在，跳过此步。
 
 ---
 
@@ -120,7 +125,8 @@ await page.screenshot({ path: '模块名-首页.png' });
 ## 7. 不用做的事
 
 - 🚫 **不要**在没有 `weapp-env-setup` 环境的情况下触发环境安装流程（假设项目已在环境装好后开始）
-- 🚫 **不要**跳过 `.agents/` 目录的读取（如果存在）
+- 🚫 **不要**跳过 `./my-app/.agents/` 目录的读取（如果存在）
+- 🚫 **不要**到仓库外（如 `~/Desktop/apps/`）找代码 —— unibest 实际工程在 `./my-app/`
 - 🚫 **不要**用本地 SVG 作为主要图片资源（微信小程序可能压缩）
 - 🚫 **不要**硬编码状态栏高度（如写死 `padding-top: 44px`），必须动态获取
 - 🚫 **不要**省略安全区适配（底部内容被刘海屏遮挡是 P0 bug）
