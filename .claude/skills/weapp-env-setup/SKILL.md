@@ -1,6 +1,6 @@
 ---
 name: weapp-env-setup
-description: Auto-install the full environment for building WeChat Mini Programs (微信小程序) with AI assistance. Detects the OS, installs Node.js via nvm, pnpm, Git, helps install Cursor + WeChat DevTools, then scaffolds a unibest project. Use when the user asks to install the WeChat Mini Program development environment, set up the unibest scaffold, or start the "用 AI 做你的第一个小程序" tutorial.
+description: Auto-install the full environment for building WeChat Mini Programs (微信小程序) with AI assistance. Detects the OS, installs Node.js via nvm, pnpm, Git, helps install Cursor + WeChat DevTools, **and configures wechat-devtools MCP server so the Agent can directly control the WeChat DevTools UI for screenshot/click testing**, then scaffolds a unibest project. Use when the user asks to install the WeChat Mini Program development environment, set up the unibest scaffold, or start the "用 AI 做你的第一个小程序" tutorial.
 ---
 
 # 微信小程序 AI 开发环境一键配置（自动版）
@@ -37,6 +37,7 @@ Agent 在开始前必须用 `AskQuestion` 向学员确认：
 - [ ] 3. Git                                ← 🤖 Agent 自动（Windows 除外）
 - [ ] 4. Cursor 编辑器 + 邮箱登录           ← 👤 学员手动
 - [ ] 5. 微信开发者工具 + 微信扫码登录      ← 👤 学员手动
+- [ ] 5c. Cursor 配置 wechat-devtools MCP    ← 👤 学员手动 ⭐
 - [ ] 6. unibest 项目脚手架                 ← 🤖 Agent 自动
 - [ ] 7. 验收
 ```
@@ -188,6 +189,49 @@ git --version
 
 ---
 
+### Step 5c / 配置 wechat-devtools MCP server（必须学员手动）⭐
+
+> 🚫 **硬性约束**：Agent **禁止**自动修改 Cursor 的 `mcp.json`，必须由学员本人手动写入。这一步让 Agent 能**直接控制**微信开发者工具（截图、点击、读取页面数据），是自动化 UI 测试的关键。
+
+**为什么需要它**：让 Cursor 的 Agent 像人一样操作开发者工具 —— 自动打开小程序、自动截图、自动点击按钮、自动读取页面 DOM。**没有它，Agent 无法做 UI 自动化**（即便安装了 `miniprogram-automator` SDK 也无法远程调用）。
+
+**指引文案（Agent 原样输出给学员）：**
+
+```
+请在 Cursor 里配置 wechat-devtools MCP（约 1 分钟）：
+
+1. 打开 Cursor 顶部菜单
+3. 点击「Settings」 → 「MCP」
+4. 右上角「Add new global MCP server」，会打开 `~/.cursor/mcp.json`
+5. 在 mcpServers 里加入下面这段（注意 JSON 逗号）：
+
+{
+  "mcpServers": {
+    "wechat-devtools": {
+      "command": "wechatide",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}
+
+6. 保存后回到 MCP 设置页，应该能看到「wechat-devtools」显示 1 个 tool 加载成功
+7. 如果没看到，点右侧刷新按钮；还不行就重启 Cursor
+
+⚠️ 如果你的 Mac 装微信开发者工具时改了路径（比如装到 /Applications/微信开发者工具.app），
+command 可能要改成绝对路径的 cli，比如：
+"command": "/Applications/微信web开发者工具.app/Contents/MacOS/cli",
+"args": ["-p", "mcp"]
+
+验证：保存 → 重启 Cursor → 在对话里问 Agent "列出所有 MCP 工具"，
+看到 wechat-devtools 相关的工具（preview、close、自动化测试工具等）就说明成功了
+```
+
+> Agent 验证方法：在对话里问 Agent "用 wechat-devtools MCP 列出当前可用的工具列表"，Agent 应该能看到该 MCP 的工具。
+
+---
+
 ### Step 6 / 创建 unibest 项目
 
 **项目位置约定**：脚手架放在**当前仓库根目录下**的 `./my-app/`（即与 `AGENTS.md` / `.gitignore` / `.cursor/` 同层）。
@@ -265,6 +309,7 @@ echo "[OS]      $(uname -s 2>/dev/null || echo Windows)"
 - [ ] Git 有版本号
 - [ ] Cursor 已登录（学员确认）
 - [ ] 微信开发者工具已扫码（学员确认）
+- [ ] wechat-devtools MCP 已配置并加载 tool（学员确认）
 - [ ] `pnpm dev:h5` 启动后浏览器能看到带底部导航的空白应用骨架
 
 全部 ✅ 后输出祝贺语：
@@ -275,6 +320,7 @@ echo "[OS]      $(uname -s 2>/dev/null || echo Windows)"
 接下来你可以：
 - 重新运行 pnpm dev:h5 启动网页预览
 - 在 Cursor 里打开 my-app 项目，让 AI 帮你写小程序
+- 让 Agent 直接调用 wechat-devtools MCP 操作微信开发者工具（截图、点击、自动化测试）
 - 微信开发者工具导入 my-app/dist/dev/mp-weixin 即可看小程序效果
 ```
 
