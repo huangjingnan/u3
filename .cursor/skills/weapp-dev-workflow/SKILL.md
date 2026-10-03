@@ -97,7 +97,92 @@ await page.screenshot({ path: '模块名-首页.png' });
 // 3. 检查截图确认无问题后，再进行下一步
 ```
 
-#### 6.1.2 微信小程序自动化测试（miniprogram-automator）
+#### 6.1.2 微信小程序自动化测试（首选：wechat-devtools MCP server）
+
+**这是当前推荐的测试方式**，由 MCP server 直接调用开发者工具，比 `miniprogram-automator` 更轻量、无需额外写脚本、Agent 能在同一会话里完成"截图→断言→改代码→重测"的闭环。
+
+**前置条件（一次性配置，Agent 不自动执行）：**
+
+1. 微信开发者工具已安装并启动
+2. **「设置 → 安全设置 → 服务端口」已开启**
+3. **「设置 → 安全设置」勾选「启动工具时自动打开项目」**（可选但推荐）
+4. MCP server 已配置（详见 `weapp-env-setup` 的 Step 5c），配置如下：
+
+   ```json
+   // ~/.cursor/mcp.json
+   {
+     "mcpServers": {
+       "wechat-devtools": {
+         "command": "wechatide",
+         "args": ["mcp"]
+       }
+     }
+   }
+   ```
+
+5. 配置后必须**重启 Cursor** 才生效
+
+**MCP 工具清单与典型用法：**
+
+> ⚠️ 工具命名空间为 `user-wechat-devtools`。所有工具的第一个必填参数都是 `project`（项目绝对路径）。
+
+| 工具 | 用途 | 关键参数 |
+|---|---|---|
+| `simulator_open_page` | 触发编译并打开指定页面 | `project`, `page-path` |
+| `simulator_refresh` | 重新编译当前页面 | `project` |
+| `simulator_screenshot` | 截图（默认长边 1280 JPEG） | `project`,可选 `path` |
+| `automation_navigate` | 页面导航（navigateTo/switchTab/...） | `project`, `action`, `url` |
+| `automation_element_action` | 点击/输入/读元素 | `project`, `action`(tap/input/text/...), `selector`, `value` |
+| `automation_get_page_data` | 读取页面/组件 data | `project`, `selector`, `action`(getData) |
+| `automation_evaluate` | 在运行时执行任意 JS | `project`, `fnSource` |
+| `auto_preview` | 推预览到开发者微信（生成二维码） | `project`, `page-path` |
+| `quit` | 退出开发者工具 | - |
+
+**典型测试流程（Agent 直接用工具调用，无需写脚本）：**
+
+```
+1. simulator_open_page({ project, page-path: "pages/orders/index" })
+   → 自动触发编译 + 打开页面
+
+2. simulator_screenshot({ project })
+   → 拿截图，肉眼/视觉验证布局
+
+3. automation_element_action({
+     project,
+     action: "tap",
+     selector: "view.btn-submit",
+     waitForSelector: "view.btn-submit"   // 推荐：等到元素出现再点
+   })
+
+4. automation_element_action({
+     project, action: "input",
+     selector: "input.car-plate",
+     value: "京A12345"
+   })
+
+5. simulator_screenshot({ project })
+   → 看提交后的页面状态
+
+6. automation_evaluate({
+     project,
+     fnSource: "function() { return wx.getStorageSync('orders') }"
+   })
+   → 验证 Mock 数据是否正确写入
+```
+
+**优势 vs miniprogram-automator：**
+
+| 维度 | MCP server | miniprogram-automator |
+|---|---|---|
+| 写脚本 | ❌ 不需要 | ✅ 需要 |
+| Agent 直接调用 | ✅ | ❌（要开额外进程） |
+| 截图速度 | 快（直接走开发者工具 API） | 中（要走 WebSocket） |
+| 失败重试 | 在对话里直接重发工具 | 要改脚本再跑 |
+| **首选** | ✅ **推荐用这个** | 备选 |
+
+#### 6.1.3 微信小程序自动化测试（备选：miniprogram-automator）
+
+**仅当 MCP server 未配置时使用**。完整脚本见 git 历史，不再赘述要点。
 
 **安装依赖：**
 ```bash
@@ -105,38 +190,29 @@ cd my-app
 pnpm add miniprogram-automator -D
 ```
 
-**创建测试脚本 `test-miniprogram.cjs`：**
+**关键脚本骨架：**
+
 ```javascript
 const Automator = require('miniprogram-automator');
 
 async function test() {
-  // 1. 连接微信开发者工具
   const miniProgram = await Automator.launch({
     toolsPath: '/Applications/wechatwebdevtools.app/Contents/Resources/app',
     projectPath: '/项目路径/my-app/dist/dev/mp-weixin',
   });
 
-  // 2. 获取当前页面信息
   const page = await miniProgram.currentPage();
   console.log('当前页面:', page.path);
 
-  // 3. 获取页面数据
   const data = await page.data();
   console.log('页面数据:', JSON.stringify(data));
 
-  // 4. 获取页面元素
-  const elements = await page.$$('view');
-  console.log('元素数量:', elements.length);
-
-  // 5. 截图保存
   await miniProgram.screenshot({ path: './screenshot.png' });
 
-  // 6. 模拟操作（点击）
   const btn = await page.$('view.class-name');
   if (btn) await btn.tap();
 
   await miniProgram.close();
-  console.log('测试完成！');
 }
 
 test().catch(err => {
@@ -145,14 +221,16 @@ test().catch(err => {
 });
 ```
 
-**运行测试：**
-```bash
-node test-miniprogram.cjs
-```
+**运行：** `node test-miniprogram.cjs`
 
 **前提条件：**
 - 微信开发者工具已打开项目
 - 设置 → 通用设置 → 开启服务端口
+
+**判断优先级的简单规则：**
+- Agent 启动时用 `GetDynamicTools({ pattern: "wechat|devtool" })` 探测
+- 若 `user-wechat-devtools` 命名空间 `namespaceStatus === "ready"` → 用 6.1.2 MCP 方案
+- 否则用 6.1.3 miniprogram-automator 方案
 
 ---
 
@@ -387,48 +465,36 @@ pnpm build:mp-weixin
 构建成功后，**必须**通过以下方式验证页面是否正常：
 
 ```bash
-# 方法1：使用 miniprogram-ci 调用微信开发者工具 API 验证
-# 安装：pnpm add -D miniprogram-ci
-
-# 验证脚本（保存为 verify.js）
-node -e "
-const ci = require('miniprogram-ci');
-const project = new ci.Project({
-  appid: 'wx1234567890abcdef',
-  type: 'miniProgram',
-  projectPath: 'dist/build/mp-weixin',
-  privateKeyPath: 'private.wx1234567890abcdef.key',
-});
-(async () => {
-  const info = await ci.getDevCompileInfo({ project });
-  console.log('✅ 微信开发者工具验证成功', JSON.stringify(info, null, 2));
-})();
-"
-
-# 方法2：检查微信开发者工具是否正确加载项目
-# 构建日志会显示 "🚀 正在打开微信小程序开发者工具..."
-# 检查日志确认无报错即可
+# 方法1：用 wechat-devtools MCP server 验证（首选）
+# Agent 直接调用 MCP 工具，无需写脚本：
+#   1. simulator_open_page({ project, "page-path": "pages/index/index" })
+#   2. simulator_screenshot({ project })
+#   3. automation_element_action({ project, action: "tap", selector, waitForSelector })
+#   4. automation_evaluate({ project, fnSource })
+# （详见 6.1.2 节）
 ```
 
 **验证通过标准**：
 - ✅ 构建日志**无** `failed to load icon` 警告
 - ✅ 显示 `Build complete.`
-- ✅ 微信开发者工具成功打开项目（无 login 错误、无 import 错误）
+- ✅ MCP 工具能成功打开页面 + 截图（无 login 错误、无 import 错误）
 - ✅ `dist/build/mp-weixin/` 目录已生成
+- ✅ 截图肉眼检查无问题（布局、安全区、图片加载）
 
-**⚠️ 重要**：**必须调用微信开发者工具验证**，不能只检查构建日志。
+**⚠️ 重要**：**必须调用 MCP 工具验证**，不能只检查构建日志。
 
 **验证方法**：
-1. `pnpm build:mp-weixin` 构建后会自动调用微信开发者工具 API
-2. 检查终端输出是否有错误
-3. 如果出现 `code: 10`（登录用户不是开发者），说明构建本身没问题，只是权限不足
-4. 可同时打开 H5 预览：`open http://localhost:9000/`
+1. `pnpm build:mp-weixin` 构建后用 MCP 工具调用
+2. 若 MCP 调用出现 `login 错误`，先 `login` 工具扫码
+3. 可同时打开 H5 预览：`open http://localhost:9000/`
 
-**微信开发者工具能发现构建日志无法检测的问题**：
+**MCP 能发现构建日志无法检测的问题**：
 - 组件是否正确注册
 - API 调用是否失败
 - 页面渲染是否正常
-- 图标/图片是否加载成功微信开发者工具能发现构建日志无法检测的问题（如组件未注册、API 调用失败等）。
+- 图标/图片是否加载成功
+- 安全区是否被遮挡
+- 视觉一致性（导航栏 vs 页面头部颜色）
 
 ---
 
@@ -464,6 +530,260 @@ pnpm build:mp
 ```
 
 > 这是固定的交付流程：H5 验证没问题 → 构建小程序 → 学员用微信开发者工具打开验证
+
+---
+
+## 6.6 常见 UI 问题速查（交工前必查清单）
+
+### 6.6.1 ⚠️ 自定义 tabbar 遮挡问题（最常见）
+
+**症状**：底部按钮 / 列表项 / 快捷入口被自定义 tabbar 完全覆盖或压住一半。
+
+**根因**：
+- 自定义 tabbar 是 `position: fixed; bottom: 0`，高度约 50px + 安全区 ≈ 80px
+- 但页面 `<view>` 容器**没有给底部留够 padding**，导致内容跑到 tabbar 下面
+
+**解决方案**（**必须**全部做到）：
+
+1. **页面容器底部** 加 `pb-32`（约 128px），给 tabbar 让位
+   ```vue
+   <view class="min-h-screen bg-gray-50 pb-32">
+   ```
+
+2. **底部 fixed 按钮容器** 不能用 `fixed bottom-0`，要用**专用工具类 `bottom-tabbar`**（在 `uno.config.ts` 的 `rules` 中定义）：
+   ```ts
+   rules: [
+     [
+       'bottom-tabbar',
+       {
+         bottom: 'calc(50px + env(safe-area-inset-bottom))',
+       },
+     ],
+     // ... 其他安全区规则
+   ],
+   ```
+   ```vue
+   <view class="fixed bottom-tabbar left-0 right-0 z-[1001] border-t border-gray-100 bg-white p-4 pb-safe shadow-lg">
+     <view class="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 py-4 text-center text-lg font-medium text-white" @tap="onConfirm">
+       立即预约 ¥{{ price }}/小时
+     </view>
+   </view>
+   ```
+
+3. **scroll-view 父容器** 用 `flex h-screen flex-col`，scroll-view 用 `flex-1 overflow-hidden`，**不要**用 `h-[calc(100vh-XX)]`
+   ```vue
+   <view class="flex h-screen flex-col bg-gray-50">
+     <view class="bg-white"><!-- 自定义导航 --></view>
+     <scroll-view scroll-y class="flex-1 overflow-hidden">
+       <view class="p-4 pb-32"><!-- 内容 --></view>
+     </scroll-view>
+   </view>
+   ```
+
+### 6.6.2 ⚠️ iconfont 字符乱码（次常见）
+
+**症状**：`<text class="iconfont icon-location" />` 在 mp 环境显示成方块 ▢▢▢。
+
+**根因**：
+- `iconfont.css` 定义的 woff/ttf 字体在 mp 环境加载不可控
+- 字符 unicode 在 css 中未定义（只定义了几个，但代码里用了十几个）
+
+**解决方案**：
+- ❌ **不要**在 mp 环境用 iconfont 字符
+- ✅ 全部改用 UnoCSS `@iconify-json/carbon`（`i-carbon-xxx`）
+- ✅ 动态图标必须加入 `uno.config.ts` 的 `safelist`：
+   ```ts
+   safelist: [
+     'i-carbon-home',
+     'i-carbon-user',
+     'i-carbon-calendar',
+     'i-carbon-location',
+     'i-carbon-time',
+     'i-carbon-arrow-left',
+     'i-carbon-chevron-right',
+     'i-carbon-phone',
+     'i-carbon-information',
+     'i-carbon-checkmark-filled',
+     // ... 你页面用到的全部图标
+   ],
+   ```
+- ✅ 常用 icon 映射速查：
+   - 定位 → `i-carbon-location`
+   - 时间 → `i-carbon-time`
+   - 返回 → `i-carbon-arrow-left`
+   - 右箭头 → `i-carbon-chevron-right`
+   - 日历 → `i-carbon-calendar`
+   - 电话 → `i-carbon-phone`
+   - 信息 → `i-carbon-information`
+   - 成功打钩 → `i-carbon-checkmark-filled`
+
+### 6.6.3 ⚠️ 其它容易忽略的 UI 问题
+
+| 现象 | 原因 | 处理 |
+|------|------|------|
+| 顶部 Banner 与状态栏之间有白条 | 状态栏高度没加到渐变背景里 | 渐变 `<view>` 内联 `:style="{ paddingTop: \`${statusBarHeight}px\` }"` |
+| 自定义导航栏与页面头部颜色不一致 | 两者用了不同颜色变量 | 统一使用 `bg-gradient-to-r from-indigo-500 to-purple-600` |
+| 卡片图片与文字重叠（`mt-*-X`） | 用 `-mt-X` 把图片负偏移出来 | 改用 `mt-6` 正 margin，加 `px-4` |
+| tabbar 图标不显示 | UnoCSS 未注册 + `<text>` 没 `w-24px h-24px` | uno.config.ts 加 safelist + TabbarItem.vue 加尺寸 |
+| `picsum.photos` 图片不显示 | mp dev 环境未配置合法域名 | 在「详情 → 不校验合法域名」勾选，或改本地占位图 |
+| scroll-view 高度 0 | 父容器布局错 | 改 `flex h-screen flex-col` |
+| **页面顶部同时出现两层标题和返回按钮** | `definePage` 配了 `navigationBarTitleText`（渲染原生导航栏）+ 模板里又写了自定义导航栏（带返回箭头） | 见下方 **6.6.4 详解** |
+
+### 6.6.4 ⚠️ 两层导航栏问题（很常见，必须避免）
+
+**症状**：
+- 页面顶部出现 **两套标题 + 返回箭头**：上半部分是微信原生的（白色背景），下半部分是自己实现的（带渐变背景或自定义文字）
+- 或者上半部原生返回箭头 + 下半部又有一个返回箭头
+
+**根因**：
+- `definePage` 的 `style.navigationBarTitleText` 会让微信**自动渲染原生导航栏**（带返回按钮）
+- 模板里又写了一套 `<view class="自定义导航栏">`（带状态栏占位 + 返回箭头 + 标题）
+- 两层同时渲染，必然重叠
+
+**修复方案（选一）**：
+
+#### 方案 A：用自定义导航栏（推荐，可控性高）
+
+`definePage` 改为：
+```ts
+definePage({
+  style: {
+    navigationStyle: 'custom', // 完全隐藏原生导航栏
+  },
+})
+```
+
+模板里正常写自定义导航栏：
+```vue
+<view class="bg-white">
+  <view :style="{ height: `${statusBarHeight}px` }" />
+  <view class="flex items-center px-4 py-3">
+    <text class="i-carbon-arrow-left mr-3 text-lg" @tap="uni.navigateBack()" />
+    <text class="text-base font-medium">{{ title }}</text>
+  </view>
+</view>
+```
+
+#### 方案 B：用原生导航栏（最简，省事）
+
+`definePage` 保持原样：
+```ts
+definePage({
+  style: {
+    navigationBarTitleText: '场地列表',
+    navigationBarBackgroundColor: '#ffffff',
+    navigationBarTextStyle: 'black',
+  },
+})
+```
+
+**删掉**模板里的：
+```vue
+<!-- ❌ 不要这样 -->
+<view class="bg-white">
+  <view :style="{ height: `${statusBarHeight}px` }" />
+  <view class="flex items-center px-4 py-3">
+    <text class="i-carbon-arrow-left mr-3 text-lg" @tap="uni.navigateBack()" />
+    <text class="text-base font-medium">{{ title }}</text>
+  </view>
+</view>
+```
+
+原生导航栏会自动处理状态栏 + 返回按钮 + 标题。
+
+**判断规则**：
+- ✅ **tabbar 页面**（首页/订单/我的）：用方案 B（原生），因为自定义 tabbar 与自定义 navbar 容易冲突
+- ✅ **非 tabbar 页面**（详情/预约/成功）：用方案 A（自定义），因为可以做到与渐变背景完美融合
+
+**⚠️ 严禁**：两个方案都写一份，必然两层标题。
+
+---
+
+## 6.7 修复后立即自动验证（写在 skill 中）
+
+### 6.7.1 Agent 侧的"修改即验证"闭环
+
+每次代码修改后，**Agent 必须立即执行**：
+
+1. **首选**：`pnpm dev:mp`（开发模式，watch 状态，自动 rebuild `dist/dev/mp-weixin/`）
+2. **如果 dev:mp 没运行**：先 `pnpm dev:mp`（在后台）→ 等待编译日志出现 "Watching for changes" → 再执行 MCP 验证
+3. **不要用 `pnpm build:mp-weixin`**：生产构建不 watch，会造成学员每次改完都得手动重启 dev:mp
+4. 用 `user-wechat-devtools` MCP 工具（参见 6.1.2）：
+   - `open_project` 打开项目窗口（`dist/dev/mp-weixin`）
+   - `simulator_open_page` 打开关键路由（首页/列表/详情/表单/订单）
+   - `simulator_screenshot` 截图
+   - 视觉确认无问题后继续下一个修改
+
+**禁止**：完成所有改动后才一次性自测。**每一次**改动都要重新打开 + 截图。
+
+**自测截图后必须检查清单**（一眼扫过去）：
+1. ✅ **没有两层导航栏**（6.6.4）
+2. ✅ 底部内容**没被 tabbar 遮挡**（6.6.1）
+3. ✅ iconfont 字符**没变成方块**（6.6.2）
+4. ✅ 安全区适配到位
+
+### 6.7.2 用户侧的"开发 + 热更新"工作流
+
+**如果学员自己开发**（不是 Agent 在改），推荐工作流：
+
+1. **终端1**：`pnpm dev:mp` —— vite watch 模式，自动 rebuild `dist/dev/mp-weixin/`
+2. **微信开发者工具**：导入 `dist/dev/mp-weixin/`，**勾选"自动保存时编译"**（编辑→保存即重编译）
+3. 改 `src/` 文件 → 保存 → vite 自动 rebuild → 微信开发者工具自动 reload
+
+**⚠️ 关键点**：
+- `pnpm dev:mp` 必须**保持运行**，不能 Ctrl+C 退出
+- 微信开发者工具里改的文件**无效**，必须改 `src/`（让 vite watch 触发 rebuild）
+- 如果 `pnpm dev:mp` 没启动就改了代码，需要先启动它
+- 学员看到效果慢时，第一反应是**检查终端1 是否还在**、**微信开发者工具是否还在"自动保存"模式**
+
+### 6.7.2.1 测试 AppID 反复失效的永久解法（强烈推荐）
+
+**症状**：`pnpm dev:mp` 启动时，日志报 `❌ 打开微信小程序开发者工具失败: 登录用户不是该小程序的开发者, [code 10]`（`APPID_ERROR`）。Agent 改一次代码、工具就重载一次，又报一次。
+
+**根因**：unibest 默认 `appid: touristappid`（测试号），**手动开开发者工具能跑**，但 `vite plugin` 首次构建自动调 `cli open` 时走的是带权限校验的接口 → 失败 → vite 启动后还会反复触发 → 学员以为热更新也坏了。
+
+**永久解法**（unibest 框架已内置开关 `SKIP_OPEN_DEVTOOLS`，只需启用）：
+
+```bash
+# 一次性写入 shell 配置（macOS/Linux 用户）
+echo 'export SKIP_OPEN_DEVTOOLS=true' >> ~/.zshrc
+source ~/.zshrc
+
+# Windows PowerShell
+[System.Environment]::SetEnvironmentVariable('SKIP_OPEN_DEVTOOLS','true','User')
+```
+
+之后 `pnpm dev:mp` **不再自动调 cli open**，只写 `dist/dev/mp-weixin/`。配合下面的手动首次打开，热更新链路完全打通：
+
+1. 在微信开发者工具**手动**导入 `dist/dev/mp-weixin/`（一次性；测试 AppID 手动开是放行的）
+2. 工具**保持开启**、模拟器点亮
+3. 改 `src/` → vite watch 写 dist → 工具自动 reload → 模拟器自动刷新
+4. **零 APPID_ERROR**
+
+**⚠️ 别踩的坑**：
+- 不要把 `SKIP_OPEN_DEVTOOLS` 写到 `my-app/.env` —— `vite.config.ts` 是从 `process.env` 读的（**不是** `loadEnv`），`.env` 里写无效
+- 不要每次终端开新窗口再 export 一次——会忘；写到 `~/.zshrc` 一劳永逸
+- **首次手动开工具这一步省不掉**——vite 不再帮你开，得学员自己点一次
+
+**Agent 侧自测遇到 APPID_ERROR 怎么办**：
+1. 先帮学员把 `SKIP_OPEN_DEVTOOLS=true` 写入 `~/.zshrc` 并 `source`
+2. 让学员**手动**打开一次微信开发者工具导入 `dist/dev/mp-weixin/`
+3. 再用 MCP `simulator_open_page` + `simulator_screenshot` 验证
+4. 验证完告诉学员热更新链路已打通，可以自己改了
+
+### 6.7.3 自动部署脚本（可选）
+
+`my-app/scripts/watch-mp.mjs` 提供：
+- 监听 `src/` + 配置文件改动 → 写信号文件 `/tmp/u3-test/.autotest-signal`
+- Agent 端 polling 该信号 → 自动触发 MCP 截图验证
+
+启动方式（需要在终端 2 单独跑）：
+
+```bash
+pnpm dev:mp:auto
+```
+
+⚠️ 此脚本**不重启 dev:mp**，仅做"改动 → 信号 → Agent 截图"的信号中转。dev:mp 仍需手动启动（终端1）。
 
 ---
 
