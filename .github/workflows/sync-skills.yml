@@ -1,0 +1,70 @@
+name: sync-skills-check
+
+# 只做"检测"：推上来的代码如果 .cursor/ 和 .claude/.codex/ 不一致，CI 报错
+# 不做任何自动修复/自动 commit
+# 修复方式：在本地跑 bash scripts/sync-skills.sh → 自己 git commit/push
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.cursor/skills/**'
+      - '.claude/skills/**'
+      - '.codex/skills/**'
+  pull_request:
+    paths:
+      - '.cursor/skills/**'
+      - '.claude/skills/**'
+      - '.codex/skills/**'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-skills-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify .claude/ and .codex/ are in sync with .cursor/
+        run: |
+          chmod +x scripts/sync-skills.sh
+          bash scripts/sync-skills.sh
+
+      - name: Check for uncommitted changes
+        id: check
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "## ❌ SKILL.md 不一致" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "源文件 \`.cursor/skills/...\` 与 \`.claude/\`、\`.codex/\` 不一致。" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**修复步骤（在本地执行）：**" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            echo "bash scripts/sync-skills.sh" >> "$GITHUB_STEP_SUMMARY"
+            echo "git add .claude/skills/ .codex/skills/" >> "$GITHUB_STEP_SUMMARY"
+            echo "git commit -m 'chore: 同步 SKILL.md'" >> "$GITHUB_STEP_SUMMARY"
+            echo "git push" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### git status 输出：" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            git status >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "## ✅ SKILL.md 一致" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Fail if inconsistent
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          echo "❌ 检测到 SKILL.md 不一致，已在 Summary 中给出修复步骤" >&2
+          exit 1

@@ -62,6 +62,8 @@ AI 会自动：
 | GitHub Copilot Coding Agent | ⚠️ 部分 | 读 `.github/copilot-instructions.md` 引导 |
 | 其他 Agent Skills Spec 工具 | ✅ | 读 `.codex/skills/.../SKILL.md`（按官方 spec） |
 
+> **CI 不自动 commit**：本仓库不启用任何自动修复/自动提交。`.github/workflows/sync-skills.yml` 只做**检测**，发现不一致会在 PR 报错，但**修复完全由维护者本地操作**（见下）。
+
 ## 维护流程
 
 修改 Skill 的步骤：
