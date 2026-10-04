@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>App 风格切换演示 · 同一款 App 的 8 种 UI 风格</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto, Arial, sans-serif;
+    background: #F4F3EE;
+    color: #1A1B1C;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 28px 20px 50px; }
+
+  .layout {
+    display: flex; gap: 32px; align-items: flex-start; justify-content: center;
+    margin-top: 22px; flex-wrap: nowrap;
+  }
+
+  /* ---- 左侧：风格控制区 ---- */
+  .panel { flex: 0 1 300px; min-width: 240px; max-width: 300px; }
+  .panel .auto-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .auto-row span { font-size: 13px; color: #6B7280; }
+  .auto-btn {
+    background: #4F6EF7; color: #fff; border: none; border-radius: 10px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: opacity .2s;
+  }
+  .auto-btn:hover { opacity: .9; }
+  .auto-btn.playing { background: #22C55E; }
+
+  .theme-btn {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px; padding: 11px 14px; margin-bottom: 8px;
+    font-size: 14px; font-weight: 600; color: #1A1B1C; cursor: pointer;
+    transition: all .15s ease;
+  }
+  .theme-btn:hover { border-color: rgba(79,110,247,0.45); }
+  .theme-btn.active { border-color: #4F6EF7; box-shadow: 0 0 0 2px rgba(79,110,247,0.15); }
+  .theme-btn .dot {
+    width: 16px; height: 16px; border-radius: 6px; flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+  }
+  .theme-btn .name { flex: 1; text-align: left; }
+  .theme-btn .en { font-size: 11px; color: #9CA3AF; font-weight: 500; }
+
+  .hint {
+    margin-top: 14px; background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px; padding: 12px 14px; font-size: 12.5px; color: #6B7280;
+  }
+
+  /* ---- 中间：手机框 ---- */
+  .stage {
+    flex: 0 0 auto; display: flex; justify-content: center;
+  }
+  /* 手机整体等比缩放：用 --phone-scale 控制，保证任何宽度下都和面板同一行 */
+  .phone {
+    width: 384px; height: 790px; border-radius: 46px;
+    background: var(--bg);
+    border: 9px solid #17181C;
+    box-shadow: 0 24px 60px rgba(20,24,40,0.22);
+    overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+    transition: background .45s ease;
+    font-size: 14px;
+    zoom: var(--phone-scale, 1);
+  }
+  .phone * { transition: background .45s ease, color .45s ease, box-shadow .45s ease, border-color .45s ease, border-radius .45s ease; }
+
+  /* 状态栏 */
+  .statusbar {
+    height: 34px; padding: 0 22px; display: flex; align-items: center;
+    justify-content: space-between; color: var(--text); flex-shrink: 0;
+    font-size: 13px; font-weight: 600;
+  }
+  .statusbar .sb-right { display: flex; align-items: center; gap: 6px; }
+
+  /* 导航栏 */
+  .navbar {
+    height: 52px; padding: 0 20px; display: flex; align-items: center;
+    justify-content: space-between; flex-shrink: 0;
+    background: var(--nav); color: var(--text);
+    border-bottom: 1px solid var(--nav-line, transparent);
+  }
+  .nav-title { font-size: 19px; font-weight: 700; }
+  .nav-icons { display: flex; gap: 14px; color: var(--text); }
+
+  /* 内容区 */
+  .content { flex: 1; padding: 16px; overflow: hidden; display: flex; flex-direction: column; gap: 14px; background: transparent; }
+
+  .hero { border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); border: var(--border); padding: 16px; flex-shrink: 0; }
+  .hero-label { font-size: 12px; color: var(--sub); }
+  .hero-num { font-size: 40px; font-weight: 800; letter-spacing: -1px; color: var(--text); margin: 6px 0 2px; line-height: 1.1; }
+  .hero-sub { font-size: 12px; color: var(--sub); }
+  .hero-progress { height: 6px; border-radius: 99px; background: var(--card-2); margin-top: 12px; overflow: hidden; }
+  .hero-progress i { display: block; height: 100%; width: 74%; border-radius: 99px; background: var(--primary); }
+
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; flex-shrink: 0; }
+  .grid-item { border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); border: var(--border); padding: 12px 6px; text-align: center; }
+  .grid-item .gi-icon { font-size: 22px; line-height: 1.2; }
+  .grid-item .gi-text { font-size: 11px; color: var(--text); margin-top: 6px; font-weight: 600; }
+
+  .list { border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); border: var(--border); padding: 6px 14px; flex-shrink: 0; }
+  .list-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 13px; color: var(--text); }
+  .list-row + .list-row { border-top: 1px solid var(--line, rgba(0,0,0,0.05)); }
+  .list-row .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+  .list-row .lsub { margin-left: auto; font-size: 11px; color: var(--sub); }
+
+  .cta {
+    border: none; width: 100%; padding: 15px; border-radius: var(--radius);
+    background: var(--primary); color: var(--primary-text, #fff);
+    font-size: 15px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    box-shadow: var(--cta-shadow, none);
+  }
+
+  /* 底部 Tab */
+  .tabbar {
+    height: 64px; display: flex; align-items: stretch; flex-shrink: 0;
+    background: var(--nav); border-top: 1px solid var(--nav-line, transparent);
+  }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--sub); }
+  .tab .t-dot { width: 18px; height: 3px; border-radius: 99px; background: transparent; }
+  .tab.active { color: var(--primary); font-weight: 700; }
+  .tab.active .t-dot { background: var(--primary); }
+
+  /* ============ 8 种风格主题 ============ */
+  .theme-flat {
+    --bg: #F5F7FA; --nav: #FFFFFF; --nav-line: #EEF0F4;
+    --card: #FFFFFF; --card-2: #EFF2F7; --line: rgba(0,0,0,0.05);
+    --text: #111827; --sub: #8A94A6;
+    --primary: #3B82F6; --primary-text: #fff; --primary-soft: rgba(59,130,246,0.1);
+    --radius: 14px; --shadow: none; --border: none;
+  }
+
+  .theme-glass {
+    --bg: linear-gradient(165deg, #6E8EF7 0%, #A37CE8 52%, #EF9FC4 100%);
+    --nav: rgba(255,255,255,0.18); --nav-line: rgba(255,255,255,0.35);
+    --card: rgba(255,255,255,0.26); --card-2: rgba(255,255,255,0.3); --line: rgba(255,255,255,0.25);
+    --text: #FFFFFF; --sub: rgba(255,255,255,0.88);
+    --primary: #FFFFFF; --primary-text: #4C4C9C;
+    --radius: 18px; --shadow: 0 8px 24px rgba(60,60,140,0.25); --border: 1px solid rgba(255,255,255,0.55);
+  }
+  .theme-glass .hero, .theme-glass .grid-item, .theme-glass .list {
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  .theme-glass .cta { background: rgba(255,255,255,0.75); box-shadow: 0 6px 18px rgba(60,60,140,0.28); }
+
+  .theme-neu {
+    --bg: #E8EBF0; --nav: #E8EBF0;
+    --card: #E8EBF0; --card-2: #E8EBF0; --line: rgba(0,0,0,0.04);
+    --text: #4B5563; --sub: #8A94A6;
+    --primary: #6C7A96; --primary-text: #FFFFFF;
+    --radius: 18px; --shadow: 5px 5px 10px rgba(163,177,198,0.6), -5px -5px 10px rgba(255,255,255,0.85); --border: none;
+  }
+  .theme-neu .hero, .theme-neu .grid-item, .theme-neu .list {
+    box-shadow: 5px 5px 10px rgba(163,177,198,0.6), -5px -5px 10px rgba(255,255,255,0.85);
+  }
+  .theme-neu .cta { box-shadow: inset 4px 4px 8px rgba(163,177,198,0.55), inset -4px -4px 8px rgba(255,255,255,0.85); }
+  .theme-neu .tab.active .t-dot { box-shadow: none; }
+
+  .theme-clay {
+    --bg: #FFF6E9; --nav: #FFF6E9; --nav-line: rgba(0,0,0,0.04);
+    --card: #FFFFFF; --card-2: #FFEBD0; --line: rgba(0,0,0,0.04);
+    --text: #4A3F35; --sub: #A8998A;
+    --primary: #FF9F45; --primary-text: #fff;
+    --radius: 24px;
+    --shadow: inset -4px -6px 8px rgba(0,0,0,0.07), inset 3px 4px 6px rgba(255,255,255,0.65), 0 8px 18px rgba(255,159,69,0.18); --border: none;
+  }
+  .theme-clay .hero, .theme-clay .grid-item, .theme-clay .list {
+    box-shadow: inset -4px -6px 8px rgba(0,0,0,0.07), inset 3px 4px 6px rgba(255,255,255,0.65), 0 8px 18px rgba(255,159,69,0.16);
+  }
+  .theme-clay .cta { box-shadow: inset -4px -6px 8px rgba(0,0,0,0.14), inset 3px 4px 6px rgba(255,255,255,0.45), 0 8px 16px rgba(255,159,69,0.32); }
+  .theme-clay .grid-item .gi-icon { display: inline-block; }
+
+  .theme-m3 {
+    --bg: #FDF7F0; --nav: #FDF7F0;
+    --card: #FFFFFF; --card-2: #F7F2FA; --line: rgba(0,0,0,0.05);
+    --text: #1C1B1F; --sub: #79747E;
+    --primary: #6750A4; --primary-text: #fff;
+    --radius: 20px; --shadow: 0 3px 10px rgba(0,0,0,0.08); --border: none;
+  }
+  .theme-m3 .cta { border-radius: 99px; }
+  .theme-m3 .hero-progress i { border-radius: 99px; }
+
+  .theme-type {
+    --bg: #FFFFFF; --nav: #FFFFFF; --nav-line: #EFEFEF;
+    --card: #FFFFFF; --card-2: #F5F5F5; --line: rgba(0,0,0,0.06);
+    --text: #0A0A0A; --sub: #9CA3AF;
+    --primary: #111111; --primary-text: #fff;
+    --radius: 6px; --shadow: none; --border: none;
+  }
+  .theme-type .hero { padding: 20px 16px; }
+  .theme-type .hero-num { font-size: 62px; letter-spacing: -3px; font-weight: 900; }
+  .theme-type .hero-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
+  .theme-type .nav-title { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
+  .theme-type .grid-item .gi-text { font-size: 10px; letter-spacing: 1px; }
+  .theme-type .list-row { font-size: 13px; }
+
+  .theme-bento {
+    --bg: #F3F0FF; --nav: #F3F0FF;
+    --card: #FFFFFF; --card-2: #EDE7FF; --line: rgba(0,0,0,0.04);
+    --text: #2B2350; --sub: #8B84B8;
+    --primary: #6C5CE7; --primary-text: #fff;
+    --radius: 18px; --shadow: 0 2px 8px rgba(80,60,200,0.10); --border: none;
+  }
+  .theme-bento .content {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .theme-bento .hero { grid-column: 1 / -1; }
+  .theme-bento .grid4 { grid-column: 1 / -1; }
+  .theme-bento .list { grid-column: 1; }
+  .theme-bento .cta { grid-column: 2; align-self: end; }
+  .theme-bento .cta { border-radius: 18px; }
+
+  .theme-dark {
+    --bg: #121212; --nav: #121212; --nav-line: #262626;
+    --card: #1E1E1E; --card-2: #262626; --line: rgba(255,255,255,0.06);
+    --text: #F5F5F5; --sub: #9E9E9E;
+    --primary: #3B82F6; --primary-text: #fff;
+    --radius: 16px; --shadow: none; --border: 1px solid #2E2E2E;
+  }
+
+  /* ---- 顶部横幅：提示词复制区 ---- */
+  .prompt-card {
+    max-width: 1020px; margin: 0 auto;
+    background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 16px; padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .pc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .pc-head span { font-size: 13px; color: #6B7280; }
+  .pc-head b { color: #1A1B1C; }
+  .pc-copy {
+    background: #4F6EF7; color: #fff; border: none; border-radius: 10px;
+    padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0;
+    transition: background .15s ease;
+  }
+  .pc-copy:hover { opacity: .92; }
+  .pc-copy.copied { background: #22C55E; }
+  .pc-text {
+    background: #F7F8FA; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px;
+    padding: 12px 14px; font-size: 13.5px; color: #374151; line-height: 1.75; margin-top: 12px;
+    user-select: text; white-space: pre-wrap; word-break: break-word;
+  }
+  .pc-note { font-size: 12px; color: #8A94A6; margin-top: 10px; line-height: 1.7; }
+
+  .foot { margin-top: 34px; font-size: 12px; color: #9CA3AF; text-align: center; }
+
+  /* ============ 响应式：窄屏时等比缩小手机，始终与风格面板同行 ============ */
+  @media (max-width: 860px) {
+    .layout { gap: 24px; }
+    .phone { zoom: 0.82; }
+  }
+  @media (max-width: 720px) {
+    .layout { gap: 18px; }
+    .panel { min-width: 200px; flex: 0 1 200px; }
+    .phone { zoom: 0.68; }
+  }
+  @media (max-width: 560px) {
+    .layout { flex-wrap: wrap; justify-content: center; }
+    .panel { flex: 1 1 100%; max-width: 100%; min-width: 0; }
+    .phone { zoom: 0.62; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 顶部横幅：提示词复制区 -->
+  <div class="prompt-card">
+    <div class="pc-head">
+      <span>当前风格：<b id="pcName">扁平极简</b> 的 AI 提示词</span>
+      <button class="pc-copy" id="pcCopy">复制提示词</button>
+    </div>
+    <div class="pc-text" id="pcText"></div>
+    <div class="pc-note">💡 <b>怎么用：</b>点上方「复制提示词」按钮 → 到 AI 对话框按 <b>Cmd+V</b>（Windows 用 Ctrl+V）粘贴发送，AI 就会照着这套风格复刻整个 App。也可以直接用鼠标选中上方文字复制。点击下方任意风格按钮，这里会自动换成对应的提示词。</div>
+  </div>
+
+  <div class="layout">
+
+    <!-- 左侧控制面板 -->
+    <div class="panel">
+      <div class="auto-row">
+        <span>自动轮播对比</span>
+        <button class="auto-btn playing" id="autoBtn">⏸ 停止轮播</button>
+      </div>
+
+      <button class="theme-btn active" data-theme="flat"><span class="dot" style="background:#3B82F6"></span><span class="name">扁平极简</span><span class="en">Flat</span></button>
+      <button class="theme-btn" data-theme="glass"><span class="dot" style="background:linear-gradient(135deg,#6E8EF7,#EF9FC4)"></span><span class="name">玻璃拟态</span><span class="en">Glass</span></button>
+      <button class="theme-btn" data-theme="neu"><span class="dot" style="background:#C9D2DF"></span><span class="name">新拟态</span><span class="en">Soft UI</span></button>
+      <button class="theme-btn" data-theme="clay"><span class="dot" style="background:#FF9F45"></span><span class="name">黏土拟态</span><span class="en">Clay</span></button>
+      <button class="theme-btn" data-theme="m3"><span class="dot" style="background:#6750A4"></span><span class="name">Material 3</span><span class="en">M3</span></button>
+      <button class="theme-btn" data-theme="type"><span class="dot" style="background:#111111"></span><span class="name">超大排版</span><span class="en">Type-First</span></button>
+      <button class="theme-btn" data-theme="bento"><span class="dot" style="background:#6C5CE7"></span><span class="name">Bento 便当盒</span><span class="en">Bento</span></button>
+      <button class="theme-btn" data-theme="dark"><span class="dot" style="background:#121212"></span><span class="name">暗色模式</span><span class="en">Dark</span></button>
+
+      <div class="hint">💡 提示：手机上就是完整 App——顶部状态栏、导航、首页内容（概览卡 + 快捷入口 + 待办列表 + 主按钮）、底部 Tab 栏。选中任意风格后，复制上方提示词即可让 AI 复刻整体效果。</div>
+    </div>
+
+    <!-- 右侧手机 -->
+    <div class="stage">
+      <div class="phone theme-flat" id="phone">
+        <!-- 状态栏 -->
+        <div class="statusbar">
+          <span>9:41</span>
+          <span class="sb-right">
+            <svg width="14" height="11" viewBox="0 0 14 11"><rect x="0" y="7" width="3" height="4" rx="0.8" fill="currentColor"/><rect x="4.2" y="5" width="3" height="6" rx="0.8" fill="currentColor"/><rect x="8.4" y="2.5" width="3" height="8.5" rx="0.8" fill="currentColor"/><rect x="12.6" y="0" width="1.4" height="11" rx="0.7" fill="currentColor" opacity="0.4"/></svg>
+            <svg width="15" height="11" viewBox="0 0 15 11"><path d="M7.5 9.3c-.6 0-1.1.5-1.1 1.1 0 .6.5 1.1 1.1 1.1s1.1-.5 1.1-1.1c0-.6-.5-1.1-1.1-1.1z" fill="currentColor"/><path d="M7.5 6.3c-1.3 0-2.5.5-3.4 1.3l1 1.1c.6-.6 1.5-1 2.4-1s1.8.4 2.4 1l1-1.1c-.9-.8-2.1-1.3-3.4-1.3z" fill="currentColor"/><path d="M7.5 3.1c-2.2 0-4.2.9-5.7 2.3l1 1.1C4.2 5.3 5.8 4.5 7.5 4.5s3.3.8 4.7 2l1-1.1c-1.5-1.4-3.5-2.3-5.7-2.3z" fill="currentColor"/></svg>
+            <svg width="22" height="11" viewBox="0 0 22 11"><rect x="0.5" y="0.5" width="17" height="10" rx="2.5" fill="none" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="11" height="7" rx="1.5" fill="currentColor"/><path d="M19 3.5v4c.9-.4 1.5-1.2 1.5-2s-.6-1.6-1.5-2z" fill="currentColor" opacity="0.5"/></svg>
+          </span>
+        </div>
+
+        <!-- 导航栏 -->
+        <div class="navbar">
+          <span class="nav-title">今天</span>
+          <span class="nav-icons">
+            <svg width="18" height="18" viewBox="0 0 18 18"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12.4 12.4L16 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            <svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 3.2v11.6M3.2 9h11.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          </span>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="content">
+          <div class="hero">
+            <div class="hero-label">10月4日 · 周日</div>
+            <div class="hero-num">12,480</div>
+            <div class="hero-sub">今日步数 · 目标 10,000</div>
+            <div class="hero-progress"><i></i></div>
+          </div>
+
+          <div class="grid4">
+            <div class="grid-item"><div class="gi-icon">🍎</div><div class="gi-text">饮食</div></div>
+            <div class="grid-item"><div class="gi-icon">🏃</div><div class="gi-text">运动</div></div>
+            <div class="grid-item"><div class="gi-icon">😴</div><div class="gi-text">睡眠</div></div>
+            <div class="grid-item"><div class="gi-icon">💧</div><div class="gi-text">喝水</div></div>
+          </div>
+
+          <div class="list">
+            <div class="list-row"><span class="dot"></span>晨间拉伸 30 分钟<span class="lsub">已完成</span></div>
+            <div class="list-row"><span class="dot"></span>阅读 20 页<span class="lsub">待办</span></div>
+          </div>
+
+          <button class="cta">记录今日</button>
+        </div>
+
+        <!-- 底部 Tab -->
+        <div class="tabbar">
+          <div class="tab active"><span class="t-dot"></span>今天</div>
+          <div class="tab"><span class="t-dot"></span>统计</div>
+          <div class="tab"><span class="t-dot"></span>圈子</div>
+          <div class="tab"><span class="t-dot"></span>我的</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">App 风格切换演示 · 界面为 CSS 绘制的示意，用于整体风格对照 · 自动轮播每 2.5 秒切换一套</div>
+</div>
+
+<script>
+(function () {
+  try {
+    var phone = document.getElementById('phone');
+    var autoBtn = document.getElementById('autoBtn');
+    var btns = document.querySelectorAll('.theme-btn');
+    var pcName = document.getElementById('pcName');
+    var pcText = document.getElementById('pcText');
+    var pcCopy = document.getElementById('pcCopy');
+    var themes = ['flat', 'glass', 'neu', 'clay', 'm3', 'type', 'bento', 'dark'];
+    var idx = 0;
+    var timer = null;
+    var current = 'flat';
+
+    var names = {
+      flat: '扁平极简', glass: '玻璃拟态', neu: '新拟态', clay: '黏土拟态',
+      m3: 'Material 3', type: '超大排版', bento: 'Bento 便当盒', dark: '暗色模式'
+    };
+    var prompts = {
+      flat: '请设计一个扁平极简风格的移动端 App：纯色背景（白色或浅灰），2D 纯色图标；无阴影、无渐变、无纹理；层级靠字号大小和留白区分；按钮用单一品牌色实心圆角矩形；间距遵循 8pt 网格；整体干净克制、信息一目了然。',
+      glass: '请设计一个玻璃拟态（Glassmorphism）风格的移动端 App：底层为彩色渐变背景；卡片采用半透明白色磨砂质感，带背景模糊（backdrop-filter: blur）；卡片边缘用 1px 半透明白色细描边；卡片呈悬浮层级；文字用深色保证对比度；整体通透高级，适合音乐、视频、天气类应用。',
+      neu: '请设计一个新拟态（Neumorphism / Soft UI）风格的移动端 App：整体使用单一浅灰色背景（如 #E8EBF0）；卡片外凸用双阴影（左上亮、右下暗）；按钮内凹用 inset 双阴影；所有元素与背景同色，靠光影表现立体；注意文字与背景的对比度；风格柔和安静，适合记账、冥想类工具。',
+      clay: '请设计一个黏土拟态（Claymorphism）风格的移动端 App：所有元素呈圆润哑光 3D 质感，像黏土或橡皮泥捏成；使用亮色系（橙、绿、粉）；内阴影模拟厚实质感，外投影柔和；大圆角、饱满 Q 弹；整体可爱有亲和力，适合儿童、游戏、娱乐类应用。',
+      m3: '请设计一个 Material Design 3 风格的移动端 App：大圆角卡片（16-24px），柔和阴影表达层级；采用动态取色的柔和色板；带 FAB 悬浮按钮；状态标签使用 chip 组件；文字层级清晰；严格符合安卓原生设计规范。',
+      type: '请设计一个超大排版（Type-First / Editorial）风格的移动端 App：巨型粗体标题占据视觉主体（字号可达屏幕宽度一半）；杂志式不对称编排；大量留白；辅助信息用小号字并拉开字距；黑白为主，最多加一个强调色；有高级感和艺术感，适合时尚、艺术、品牌展示。',
+      bento: '请设计一个 Bento 便当盒风格的移动端 App：用大小不同的圆角卡片拼贴成网格布局（两列，主卡片占 1.5 倍宽）；每张卡片放一个独立的功能或信息模块；卡片用不同柔和色块区分；整体像便当盒一样整齐又丰富；适合效率工具、个人主页、官网首屏。',
+      dark: '请设计一个暗色模式风格的移动端 App：深色背景（#121212），浅色文字（#E0E0E0）；卡片用略浅的深灰（#1E1E1E）加细边框；主按钮用高饱和品牌色；避免大面积纯黑，用深灰层次过渡；支持与浅色模式自动切换；整体护眼、低刺激。'
+    };
+
+    function copyText(text, done) {
+      function fallback() {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, function () { fallback(); done(); });
+      } else { fallback(); done(); }
+    }
+
+    function setTheme(name) {
+      current = name;
+      phone.className = 'phone theme-' + name;
+      btns.forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-theme') === name);
+      });
+      if (pcName) pcName.textContent = names[name];
+      if (pcText) pcText.textContent = prompts[name];
+    }
+
+    function next() {
+      idx = (idx + 1) % themes.length;
+      setTheme(themes[idx]);
+    }
+
+    function startAuto() {
+      if (timer) clearInterval(timer);
+      timer = setInterval(next, 2500);
+      autoBtn.textContent = '⏸ 停止轮播';
+      autoBtn.classList.add('playing');
+    }
+    function stopAuto() {
+      if (timer) { clearInterval(timer); timer = null; }
+      autoBtn.textContent = '▶ 自动轮播';
+      autoBtn.classList.remove('playing');
+    }
+
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        stopAuto();
+        setTheme(b.getAttribute('data-theme'));
+        idx = themes.indexOf(b.getAttribute('data-theme'));
+      });
+    });
+
+    autoBtn.addEventListener('click', function () {
+      if (timer) { stopAuto(); } else { startAuto(); }
+    });
+
+    if (pcCopy) {
+      pcCopy.addEventListener('click', function () {
+        copyText(prompts[current], function () {
+          var old = pcCopy.textContent;
+          pcCopy.textContent = '已复制 ✓ 去粘贴吧';
+          pcCopy.classList.add('copied');
+          setTimeout(function () {
+            pcCopy.textContent = old;
+            pcCopy.classList.remove('copied');
+          }, 3000);
+        });
+      });
+    }
+
+    setTheme('flat');
+    startAuto();
+  } catch (e) {
+    var f = document.querySelector('.foot');
+    if (f) f.textContent = '脚本异常：' + (e && e.message ? e.message : e);
+  }
+})();
+</script>
+</body>
+</html>

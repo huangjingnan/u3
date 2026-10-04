@@ -452,39 +452,42 @@ import Tabbar from '@/tabbar/index.vue'
 每次代码修改后，**立即执行以下验证**，包括调用微信开发者工具自动验证：
 
 ```bash
-# 1. 构建微信小程序（构建成功后会自动打开微信开发者工具）
-pnpm build:mp-weixin
+# 1. 单次构建微信小程序（跑完即退出，产物落在 dist/dev/mp-weixin/）
+pnpm mp:once
 
 # 2. 检查构建日志
 # ✅ 通过标准：构建日志无 "failed to load icon" 警告
-# ✅ 构建成功：显示 "Build complete."
+# ✅ 构建成功：显示 "DONE  Build complete."
 ```
+
+> ⚠️ **不要用 `pnpm build:mp` / `build:mp:test`**：它们输出到 `dist/build/mp-weixin/`，而开发者工具打开的是 `dist/dev/mp-weixin/`，路径对不上还得重新导入。用 `pnpm mp:once`（见 6.7.4）。
 
 **微信开发者工具自动验证（必须执行）**：
 
 构建成功后，**必须**通过以下方式验证页面是否正常：
 
-```bash
-# 方法1：用 wechat-devtools MCP server 验证（首选）
+```
+# 用 wechat-devtools MCP server 验证（首选）
 # Agent 直接调用 MCP 工具，无需写脚本：
-#   1. simulator_open_page({ project, "page-path": "pages/index/index" })
-#   2. simulator_screenshot({ project })
-#   3. automation_element_action({ project, action: "tap", selector, waitForSelector })
-#   4. automation_evaluate({ project, fnSource })
+#   1. open_project_window({ project: "my-app/dist/dev/mp-weixin" })
+#   2. simulator_open_page({ project, "page-path": "pages/index/index" })
+#   3. simulator_screenshot({ project })
+#   4. automation_element_action({ project, action: "tap", selector, waitForSelector })
+#   5. automation_evaluate({ project, fnSource })
 # （详见 6.1.2 节）
 ```
 
 **验证通过标准**：
 - ✅ 构建日志**无** `failed to load icon` 警告
-- ✅ 显示 `Build complete.`
-- ✅ MCP 工具能成功打开页面 + 截图（无 login 错误、无 import 错误）
-- ✅ `dist/build/mp-weixin/` 目录已生成
+- ✅ 显示 `DONE  Build complete.`
+- ✅ MCP 工具能成功打开页面 + 截图（无 login 错误、无 import 错误、**无红屏**）
+- ✅ `dist/dev/mp-weixin/` 目录已生成且页面四件套齐全
 - ✅ 截图肉眼检查无问题（布局、安全区、图片加载）
 
 **⚠️ 重要**：**必须调用 MCP 工具验证**，不能只检查构建日志。
 
 **验证方法**：
-1. `pnpm build:mp-weixin` 构建后用 MCP 工具调用
+1. `pnpm mp:once` 构建后用 MCP 工具调用
 2. 若 MCP 调用出现 `login 错误`，先 `login` 工具扫码
 3. 可同时打开 H5 预览：`open http://localhost:9000/`
 
@@ -495,6 +498,7 @@ pnpm build:mp-weixin
 - 图标/图片是否加载成功
 - 安全区是否被遮挡
 - 视觉一致性（导航栏 vs 页面头部颜色）
+- 是否有红屏（`xxx.json 文件读取错误`）
 
 ---
 
@@ -628,6 +632,7 @@ pnpm build:mp
 | `picsum.photos` 图片不显示 | mp dev 环境未配置合法域名 | 在「详情 → 不校验合法域名」勾选，或改本地占位图 |
 | scroll-view 高度 0 | 父容器布局错 | 改 `flex h-screen flex-col` |
 | **页面顶部同时出现两层标题和返回按钮** | `definePage` 配了 `navigationBarTitleText`（渲染原生导航栏）+ 模板里又写了自定义导航栏（带返回箭头） | 见下方 **6.6.4 详解** |
+| **开发者工具反复红屏 `xxx.json 文件读取错误`、目录树来回闪** | `pnpm dev:mp` watch 模式反复清空 `dist/dev/mp-weixin/` | 改用 `pnpm mp:once`（单次 build），见 **6.7.4 详解** |
 
 ### 6.6.4 ⚠️ 两层导航栏问题（很常见，必须避免）
 
@@ -705,42 +710,53 @@ definePage({
 
 每次代码修改后，**Agent 必须立即执行**：
 
-1. **首选**：`pnpm dev:mp`（开发模式，watch 状态，自动 rebuild `dist/dev/mp-weixin/`）
-2. **如果 dev:mp 没运行**：先 `pnpm dev:mp`（在后台）→ 等待编译日志出现 "Watching for changes" → 再执行 MCP 验证
-3. **不要用 `pnpm build:mp-weixin`**：生产构建不 watch，会造成学员每次改完都得手动重启 dev:mp
-4. 用 `user-wechat-devtools` MCP 工具（参见 6.1.2）：
-   - `open_project` 打开项目窗口（`dist/dev/mp-weixin`）
+1. **必须用 `pnpm mp:once`**（单次 build，约 5~10 秒跑完即退出，产物直接落到 `dist/dev/mp-weixin/`）
+2. **绝对不要**用 `pnpm dev:mp` / `dev:mp:test` / `dev:mp:prod` 长时间挂着 —— 详见 **6.7.4 血泪教训**，会导致开发者工具红屏循环
+3. **也不要用** `pnpm build:mp:test` —— 它虽然也是单次，但输出到 `dist/build/mp-weixin/`，开发者工具打开的是 `dist/dev/`，路径对不上，还得重新导入项目
+4. build 完用 `user-wechat-devtools` MCP 工具（参见 6.1.2）：
+   - `open_project_window` 打开项目窗口（`my-app/dist/dev/mp-weixin`）
    - `simulator_open_page` 打开关键路由（首页/列表/详情/表单/订单）
    - `simulator_screenshot` 截图
    - 视觉确认无问题后继续下一个修改
 
-**禁止**：完成所有改动后才一次性自测。**每一次**改动都要重新打开 + 截图。
+**如果 `pnpm mp:once` 脚本不存在**（学员是老项目），Agent 必须先帮学员加上：
+
+```json
+// my-app/package.json → scripts
+"mp:once": "node ./scripts/create-base-files.js && UNI_OUTPUT_DIR=dist/dev/mp-weixin uni build -p mp-weixin --mode test",
+"mp:once:prod": "node ./scripts/create-base-files.js && UNI_OUTPUT_DIR=dist/dev/mp-weixin uni build -p mp-weixin --mode production"
+```
+
+> 关键就是 `UNI_OUTPUT_DIR=dist/dev/mp-weixin` 这个环境变量 —— 它让**单次 build** 也能落到开发者工具已打开的目录，从而既避开 watch 清空问题，又不用重新导入项目。
+
+**禁止**：完成所有改动后才一次性自测。**每一次**改动都要重新 build + 打开 + 截图。
 
 **自测截图后必须检查清单**（一眼扫过去）：
 1. ✅ **没有两层导航栏**（6.6.4）
 2. ✅ 底部内容**没被 tabbar 遮挡**（6.6.1）
 3. ✅ iconfont 字符**没变成方块**（6.6.2）
 4. ✅ 安全区适配到位
+5. ✅ **没有红屏**（`xxx.json 文件读取错误`）—— 见 6.7.4
 
-### 6.7.2 用户侧的"开发 + 热更新"工作流
+### 6.7.2 用户侧的"开发 + 构建"工作流
 
 **如果学员自己开发**（不是 Agent 在改），推荐工作流：
 
-1. **终端1**：`pnpm dev:mp` —— vite watch 模式，自动 rebuild `dist/dev/mp-weixin/`
-2. **微信开发者工具**：导入 `dist/dev/mp-weixin/`，**勾选"自动保存时编译"**（编辑→保存即重编译）
-3. 改 `src/` 文件 → 保存 → vite 自动 rebuild → 微信开发者工具自动 reload
+1. **微信开发者工具**：导入 `my-app/dist/dev/mp-weixin/`
+2. 改 `src/` 文件 → 保存
+3. **终端1**：`pnpm mp:once`（等 `DONE Build complete.`）
+4. 微信开发者工具点「编译」刷新
 
 **⚠️ 关键点**：
-- `pnpm dev:mp` 必须**保持运行**，不能 Ctrl+C 退出
-- 微信开发者工具里改的文件**无效**，必须改 `src/`（让 vite watch 触发 rebuild）
-- 如果 `pnpm dev:mp` 没启动就改了代码，需要先启动它
-- 学员看到效果慢时，第一反应是**检查终端1 是否还在**、**微信开发者工具是否还在"自动保存"模式**
+- ❌ **不要**在终端1 挂 `pnpm dev:mp` —— 它是 watch 模式且会**反复清空 dist**，导致开发者工具红屏循环（6.7.4）
+- 微信开发者工具里改的文件**无效**，必须改 `src/`
+- 学员看到效果慢时，第一反应是**检查上一次 `pnpm mp:once` 是否 build 成功**（看有没有 `DONE Build complete.`）、**开发者工具是否在 `dist/dev/mp-weixin`**
 
 ### 6.7.2.1 测试 AppID 反复失效的永久解法（强烈推荐）
 
-**症状**：`pnpm dev:mp` 启动时，日志报 `❌ 打开微信小程序开发者工具失败: 登录用户不是该小程序的开发者, [code 10]`（`APPID_ERROR`）。Agent 改一次代码、工具就重载一次，又报一次。
+**症状**：构建时日志报 `❌ 打开微信小程序开发者工具失败: 登录用户不是该小程序的开发者, [code 10]`（`APPID_ERROR`）。
 
-**根因**：unibest 默认 `appid: touristappid`（测试号），**手动开开发者工具能跑**，但 `vite plugin` 首次构建自动调 `cli open` 时走的是带权限校验的接口 → 失败 → vite 启动后还会反复触发 → 学员以为热更新也坏了。
+**根因**：unibest 默认 `appid: touristappid`（测试号），**手动开开发者工具能跑**，但 `vite plugin` 构建时自动调 `cli open` 走的是带权限校验的接口 → 失败。
 
 **永久解法**（unibest 框架已内置开关 `SKIP_OPEN_DEVTOOLS`，只需启用）：
 
@@ -753,11 +769,11 @@ source ~/.zshrc
 [System.Environment]::SetEnvironmentVariable('SKIP_OPEN_DEVTOOLS','true','User')
 ```
 
-之后 `pnpm dev:mp` **不再自动调 cli open**，只写 `dist/dev/mp-weixin/`。配合下面的手动首次打开，热更新链路完全打通：
+之后构建**不再自动调 cli open**，只写 `dist/dev/mp-weixin/`。配合手动首次打开，链路完全打通：
 
-1. 在微信开发者工具**手动**导入 `dist/dev/mp-weixin/`（一次性；测试 AppID 手动开是放行的）
+1. 在微信开发者工具**手动**导入 `my-app/dist/dev/mp-weixin/`（一次性；测试 AppID 手动开是放行的）
 2. 工具**保持开启**、模拟器点亮
-3. 改 `src/` → vite watch 写 dist → 工具自动 reload → 模拟器自动刷新
+3. 改 `src/` → `pnpm mp:once` 写 dist → 工具点「编译」→ 模拟器刷新
 4. **零 APPID_ERROR**
 
 **⚠️ 别踩的坑**：
@@ -767,11 +783,11 @@ source ~/.zshrc
 
 **Agent 侧自测遇到 APPID_ERROR 怎么办**：
 1. 先帮学员把 `SKIP_OPEN_DEVTOOLS=true` 写入 `~/.zshrc` 并 `source`
-2. 让学员**手动**打开一次微信开发者工具导入 `dist/dev/mp-weixin/`
+2. 让学员**手动**打开一次微信开发者工具导入 `my-app/dist/dev/mp-weixin/`
 3. 再用 MCP `simulator_open_page` + `simulator_screenshot` 验证
-4. 验证完告诉学员热更新链路已打通，可以自己改了
+4. 验证完告诉学员构建链路已打通，可以自己改了
 
-### 6.7.3 自动部署脚本（可选）
+### 6.7.3 自动信号脚本（可选）
 
 `my-app/scripts/watch-mp.mjs` 提供：
 - 监听 `src/` + 配置文件改动 → 写信号文件 `/tmp/u3-test/.autotest-signal`
@@ -783,7 +799,61 @@ source ~/.zshrc
 pnpm dev:mp:auto
 ```
 
-⚠️ 此脚本**不重启 dev:mp**，仅做"改动 → 信号 → Agent 截图"的信号中转。dev:mp 仍需手动启动（终端1）。
+⚠️ 此脚本**不触发构建**，仅做"改动 → 信号 → Agent 截图"的信号中转。真正的构建由 Agent 执行 `pnpm mp:once`。
+
+### 6.7.4 ⚠️ 血泪教训：`dev:mp` watch 模式导致开发者工具红屏循环
+
+**这是一条已经付出过代价的规则，Agent 绝不能再犯。**
+
+**症状**：
+- 微信开发者工具反复弹出**红屏**：`pages/xxx/xxx.json 文件读取错误`
+- 模拟器目录树在「空」和「有内容」之间**来回闪烁**
+- 学员反馈"程序一直报错""是不是坏了""重装也没用"
+
+**根因（两层叠加）**：
+
+1. **`uni -p mp-weixin`（即 `pnpm dev:mp` / `dev:mp:test` / `dev:mp:prod`）本身就是 watch 模式，永不退出**。它输出末尾的 `DONE Build complete. Watching for changes...` 就是证据 —— 很多人误以为它 build 完就结束了。
+
+2. 每次 watch 触发 rebuild 时，uni 会**先清空** `dist/dev/mp-weixin/`，再重新写入全部文件。而微信开发者工具正在 watch 这个目录 —— 目录被清空的那一瞬间它就读不到 `pages/me/me.json` → 报错；build 写完文件回来，错误消失；下一次改动又重来一遍 → **无限循环**。
+
+3. **如果再叠加一个自己写的 watcher（如 `scripts/hot-watch.mjs`）会更糟**：它每次触发都 kill + 重启 `dev:mp`，等于**双重放大**清空-重建动作，闪得比单 watch 更厉害。
+
+**Agent 排查这条症状的标准流程**：
+
+```bash
+# 1. 确认是否有 watch 进程还挂着
+ps aux | grep -E "uni -p|uni build|hot-watch|dev:mp" | grep -v grep
+
+# 2. 看 dist 是否处于「半空」状态
+find my-app/dist/dev/mp-weixin -type f | wc -l   # 突然远小于页面数×4 → 正在被清空
+
+# 3. 确认所有页面四件套齐全（js/json/wxml/wxss）
+node -e '
+const fs=require("fs");
+const a=JSON.parse(fs.readFileSync("my-app/dist/dev/mp-weixin/app.json","utf8"));
+const list=[...a.pages, ...((a.subPackages||a.subpackages||[]).flatMap(p=>(p.pages||[]).map(x=>p.root+"/"+x)))];
+const bad=list.filter(p=>["js","json","wxml","wxss"].some(e=>!fs.existsSync(`my-app/dist/dev/mp-weixin/${p}.${e}`)));
+console.log(bad.length?`缺文件: ${bad.join(", ")}`:`✅ ${list.length} 个页面全部齐全`);
+'
+```
+
+**正确解法**（已在 `my-app/package.json` 落地）：
+
+```bash
+pnpm mp:once         # 单次 build，5~10 秒跑完即退出，产物 → dist/dev/mp-weixin/
+pnpm mp:once:prod    # 生产模式单次 build，同样落到 dist/dev/mp-weixin/
+```
+
+**为什么这样能解决**：
+- 单次 build **跑完就退出**，dist 只会被**完整地重写一次**，不会出现「空目录」中间态
+- `UNI_OUTPUT_DIR=dist/dev/mp-weixin` 让产物仍落在开发者工具已打开的目录，**不用重新导入项目**
+- 开发者工具的「自动保存时编译」可以留着（它只监听 dist 变化，不会自己清空目录，是安全的）
+
+**⛔ 明确禁止**：
+- 🚫 不要在后台长期挂 `pnpm dev:mp` / `dev:mp:test` / `dev:mp:prod`
+- 🚫 不要用 `scripts/hot-watch.mjs`（`pnpm dev:mp:hot`）—— 会放大清空-重建，红屏更严重
+- 🚫 不要为了"热更新"反复重启 watcher
+- 🚫 看到红屏第一反应不要让学员"重装项目 / 删 dist 重导"，**根因是 watch 模式，不是配置错了**
 
 ---
 
@@ -798,3 +868,7 @@ pnpm dev:mp:auto
 - 🚫 **不要**在自测失败后跳过修复直接交付
 - 🚫 **不要**连续修复 3 次仍失败后不报告就放弃
 - 🚫 **不要**在交工前跳过 Playwright 验证 —— **这是最重要的规则，交工前必须验证**
+- 🚫 **不要**用 `pnpm dev:mp` / `dev:mp:test` / `dev:mp:prod` 做构建 —— watch 模式反复清空 dist，导致开发者工具红屏循环（**6.7.4**）
+- 🚫 **不要**用 `pnpm build:mp` / `build:mp:test` 做自测构建 —— 输出到 `dist/build/`，与开发者工具打开的 `dist/dev/` 路径不符
+- 🚫 **不要**用 `pnpm dev:mp:hot`（`scripts/hot-watch.mjs`）—— 放大清空-重建，红屏更严重
+- 🚫 **不要**把 `SKIP_OPEN_DEVTOOLS` 写进 `.env` —— `vite.config.ts` 从 `process.env` 读，`.env` 无效；必须写 `~/.zshrc`
